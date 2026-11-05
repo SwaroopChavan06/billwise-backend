@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  BILLING
+  STORE
+  DELIVERY
+}
+
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  IN_PRODUCTION
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  CANCELLED
+}
+
+enum StockMovementReason {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  RETURN
+}
+
+model Branch {
+  id              String         @id @default(uuid())
+  name            String
+  legalName       String
+  gstin           String?        @unique
+  pan             String?
+  address         String
+  stateCode       String
+  phone           String?
+  email           String?
+  bankName        String?
+  bankAccount     String?
+  bankIfsc        String?
+  upiId           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  users           User[]
+  customers       Customer[]
+  products        Product[]
+  orders          Order[]
+  invoices        Invoice[]
+  stockMovements  StockMovement[]
+  numberSeries    NumberSeries[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  branchId     String
+  branch       Branch   @relation(fields: [branchId], references: [id])
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(BILLING)
+  deletedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Customer {
+  id           String    @id @default(uuid())
+  branchId     String
+  branch       Branch    @relation(fields: [branchId], references: [id])
+  name         String
+  gstin        String?
+  pan          String?
+  phone        String?
+  email        String?
+  address      String
+  stateCode    String
+  creditLimit  Decimal   @default(0) @db.Decimal(12, 2)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  orders       Order[]
+  invoices     Invoice[]
+
+  @@index([branchId, name])
+}
+
+model Product {
+  id            String          @id @default(uuid())
+  branchId      String
+  branch        Branch          @relation(fields: [branchId], references: [id])
+  name          String
+  sku           String
+  hsnCode       String
+  gstRate       Decimal         @db.Decimal(5, 2)
+  unit          String
+  sellingPrice  Decimal         @db.Decimal(12, 2)
+  deletedAt     DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  orderItems    OrderItem[]
+  stockMovement StockMovement[]
+
+  @@unique([branchId, sku])
+}
+
+model StockMovement {
+  id          String             @id @default(uuid())
+  branchId    String
+  branch      Branch             @relation(fields: [branchId], references: [id])
+  productId   String
+  product     Product            @relation(fields: [productId], references: [id])
+  quantity    Decimal            @db.Decimal(12, 3)
+  reason      StockMovementReason
+  referenceId String?
+  createdAt   DateTime           @default(now())
+
+  @@index([branchId, productId, createdAt])
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  branchId    String
+  branch      Branch      @relation(fields: [branchId], references: [id])
+  customerId  String
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  status      OrderStatus @default(DRAFT)
+  notes       String?
+  deletedAt   DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  items       OrderItem[]
+  invoice     Invoice?
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  description String
+  spec      Json?
+  quantity  Decimal  @db.Decimal(12, 3)
+  rate      Decimal  @db.Decimal(12, 2)
+}
+
+model Invoice {
+  id                   String        @id @default(uuid())
+  branchId             String
+  branch               Branch        @relation(fields: [branchId], references: [id])
+  orderId              String        @unique
+  order                Order         @relation(fields: [orderId], references: [id])
+  customerId           String
+  customer             Customer      @relation(fields: [customerId], references: [id])
+  status               InvoiceStatus @default(DRAFT)
+  invoiceNumber        String?
+  financialYear        String?
+  issueDate            DateTime?
+  dueDate              DateTime?
+  placeOfSupply        String?
+  reverseCharge        Boolean       @default(false)
+  subtotal             Decimal       @default(0) @db.Decimal(12, 2)
+  discount             Decimal       @default(0) @db.Decimal(12, 2)
+  taxableValue         Decimal       @default(0) @db.Decimal(12, 2)
+  cgst                 Decimal       @default(0) @db.Decimal(12, 2)
+  sgst                 Decimal       @default(0) @db.Decimal(12, 2)
+  igst                 Decimal       @default(0) @db.Decimal(12, 2)
+  roundOff             Decimal       @default(0) @db.Decimal(12, 2)
+  total                Decimal       @default(0) @db.Decimal(12, 2)
+  amountInWords        String?
+  supplierSnapshot     Json?
+  customerSnapshot     Json?
+  irn                  String?
+  qrCodeData           String?
+  poNumber             String?
+  poDate               DateTime?
+  transporter          String?
+  vehicleNumber        String?
+  terms                String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  items                InvoiceItem[]
+  auditEntries         AuditLog[]
+
+  @@unique([branchId, financialYear, invoiceNumber])
+  @@index([branchId, issueDate])
+}
+
+model InvoiceItem {
+  id           String   @id @default(uuid())
+  invoiceId    String
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id])
+  lineNumber   Int
+  description  String
+  hsnCode      String
+  unit         String
+  quantity     Decimal  @db.Decimal(12, 3)
+  rate         Decimal  @db.Decimal(12, 2)
+  discount     Decimal  @default(0) @db.Decimal(12, 2)
+  taxableValue Decimal  @db.Decimal(12, 2)
+  gstRate      Decimal  @db.Decimal(5, 2)
+  cgst         Decimal  @default(0) @db.Decimal(12, 2)
+  sgst         Decimal  @default(0) @db.Decimal(12, 2)
+  igst         Decimal  @default(0) @db.Decimal(12, 2)
+  total        Decimal  @db.Decimal(12, 2)
+}
+
+model NumberSeries {
+  id            String   @id @default(uuid())
+  branchId      String
+  branch        Branch   @relation(fields: [branchId], references: [id])
+  financialYear String
+  nextNumber    Int      @default(1)
+  updatedAt     DateTime @updatedAt
+
+  @@unique([branchId, financialYear])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+  actorId   String?
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
