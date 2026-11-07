@@ -11,6 +11,7 @@ The current implementation contains:
 - Invoice draft creation
 - Invoice issuing with financial-year numbering
 - Invoice totals and amount in words
+- Product catalog search for invoice item selection
 - Prisma schema for the planned PostgreSQL data model
 
 The invoice service currently stores drafts and issued invoices **in memory**.
@@ -40,6 +41,8 @@ Redis. PostgreSQL is required when Prisma persistence is connected.
 | `GET` | `/api/v1/invoices` | List issued invoices |
 | `POST` | `/api/v1/invoices/drafts` | Create or replace an invoice draft |
 | `POST` | `/api/v1/invoices/:id/issue` | Validate and issue a draft |
+| `GET` | `/api/v1/products` | List products |
+| `GET` | `/api/v1/products?search=paper` | Search products by name, SKU, or HSN |
 
 There is currently no authentication required.
 
