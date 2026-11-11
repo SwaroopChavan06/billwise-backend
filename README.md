@@ -11,7 +11,10 @@ The current implementation contains:
 - Invoice draft creation
 - Invoice issuing with financial-year numbering
 - Invoice totals and amount in words
-- Product catalog search for invoice item selection
+- Customer lookup with phone, email, address, GSTIN, and state
+- Product lookup and server-side product-price snapshots
+- Invoices with up to 15 calculated line items
+- Downloadable invoice PDFs
 - Prisma schema for the planned PostgreSQL data model
 
 The invoice service currently stores drafts and issued invoices **in memory**.
@@ -38,11 +41,15 @@ Redis. PostgreSQL is required when Prisma persistence is connected.
 | Method | Route | Purpose |
 |---|---|---|
 | `GET` | `/` | Health/basic NestJS response |
-| `GET` | `/api/v1/invoices` | List issued invoices |
-| `POST` | `/api/v1/invoices/drafts` | Create or replace an invoice draft |
+| `GET` | `/api/v1/invoices` | List drafts and issued invoices with calculated totals |
+| `POST` | `/api/v1/invoices` | Create and issue an invoice |
+| `GET` | `/api/v1/invoices/:id/pdf` | Download invoice PDF |
+| `POST` | `/api/v1/invoices/drafts` | Create a calculated invoice draft |
 | `POST` | `/api/v1/invoices/:id/issue` | Validate and issue a draft |
 | `GET` | `/api/v1/products` | List products |
 | `GET` | `/api/v1/products?search=paper` | Search products by name, SKU, or HSN |
+| `GET` | `/api/v1/customers` | List customers |
+| `GET` | `/api/v1/customers?search=apex` | Search by customer name, phone, or email |
 
 There is currently no authentication required.
 
@@ -63,7 +70,38 @@ Expected response:
 Hello World!
 ```
 
-### 2. List issued invoices
+### 2. Load customers and products
+
+```powershell
+curl.exe http://localhost:3000/api/v1/customers
+curl.exe "http://localhost:3000/api/v1/products?search=cards"
+```
+
+### 3. Create and issue an invoice
+
+`customerId` and each line's `productId` let the API fetch the saved customer
+contact information and the authoritative product price, HSN, unit, and GST
+rate. The API calculates the totals and assigns the invoice number.
+
+```powershell
+curl.exe -X POST http://localhost:3000/api/v1/invoices `
+  -H "Content-Type: application/json" `
+  -d '{\"id\":\"invoice-001\",\"customerId\":\"cust-1\",\"customerName\":\"Apex Architects\",\"customerStateCode\":\"27\",\"branchStateCode\":\"27\",\"lines\":[{\"productId\":\"prod-business-cards\",\"description\":\"Business cards\",\"hsnCode\":\"4911\",\"unit\":\"box\",\"quantity\":2,\"rate\":1000,\"discount\":0,\"gstRate\":18}]}'
+```
+
+The response includes the invoice number, customer contact snapshot, each
+calculated line total, CGST/SGST or IGST, and the final total. The product
+catalog values are used instead of trusting submitted rate/HSN/unit/GST values.
+
+### 4. Download the invoice PDF
+
+Use the invoice `id` from the create response:
+
+```powershell
+curl.exe -o invoice-001.pdf http://localhost:3000/api/v1/invoices/invoice-001/pdf
+```
+
+### 5. List invoices
 
 ```powershell
 curl.exe http://localhost:3000/api/v1/invoices
@@ -75,7 +113,7 @@ Expected initial response:
 []
 ```
 
-### 3. Create a same-state invoice draft
+### 6. Create a same-state invoice draft (optional flow)
 
 This example uses Maharashtra state code `27` for both the branch and
 customer, so GST is split into CGST and SGST.
@@ -108,7 +146,7 @@ The API returns the draft:
 }
 ```
 
-### 4. Issue the draft
+### 7. Issue the draft
 
 ```powershell
 curl.exe -X POST http://localhost:3000/api/v1/invoices/draft-001/issue
@@ -132,13 +170,13 @@ The response contains a generated invoice number such as
 }
 ```
 
-### 5. List the issued invoice
+### 8. List the issued invoice
 
 ```powershell
 curl.exe http://localhost:3000/api/v1/invoices
 ```
 
-### 6. Test an inter-state invoice
+### 9. Test an inter-state invoice
 
 Use a different customer state code, for example Karnataka `29`, while the
 branch remains Maharashtra `27`. The calculated tax appears under `igst`.

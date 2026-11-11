@@ -6,6 +6,9 @@ import { InvoicingController } from './invoicing/invoicing.controller.js';
 import { InvoicingService } from './invoicing/invoicing.service.js';
 import { ProductsController } from './products/products.controller.js';
 import { ProductsService } from './products/products.service.js';
+import { CustomersController } from './customers/customers.controller.js';
+import { CustomersService } from './customers/customers.service.js';
+import { InvoicePdfService } from './integrations/pdf/invoice-pdf.service.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -20,7 +23,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       serviceId: 'api',
     }),
   ],
-  controllers: [AppController, InvoicingController, ProductsController],
-  providers: [AppService, InvoicingService, ProductsService],
+  controllers: [AppController, InvoicingController, ProductsController, CustomersController],
+  providers: [AppService, InvoicingService, ProductsService, CustomersService, InvoicePdfService],
 })
 export class AppModule {}

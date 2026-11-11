@@ -28,4 +28,8 @@ export class ProductsService {
       `${product.name} ${product.sku} ${product.hsnCode}`.toLowerCase().includes(normalizedQuery),
     );
   }
+
+  findById(id: string): Product | undefined {
+    return this.products.find((product) => product.id === id);
+  }
 }
