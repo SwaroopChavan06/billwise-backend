@@ -8,7 +8,7 @@ import { ProductsController } from './products/products.controller.js';
 import { ProductsService } from './products/products.service.js';
 import { CustomersController } from './customers/customers.controller.js';
 import { CustomersService } from './customers/customers.service.js';
-import { InvoicePdfService } from './integrations/pdf/invoice-pdf.service.js';
+import { InvoicePrintService } from './integrations/pdf/invoice-print.service.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -24,6 +24,6 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     }),
   ],
   controllers: [AppController, InvoicingController, ProductsController, CustomersController],
-  providers: [AppService, InvoicingService, ProductsService, CustomersService, InvoicePdfService],
+  providers: [AppService, InvoicingService, ProductsService, CustomersService, InvoicePrintService],
 })
 export class AppModule {}

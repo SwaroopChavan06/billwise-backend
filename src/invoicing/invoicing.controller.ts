@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Header, Param, Post, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { InvoicePdfService } from '../integrations/pdf/invoice-pdf.service.js';
+import { InvoicePrintService } from '../integrations/pdf/invoice-print.service.js';
 import { InvoicingService } from './invoicing.service.js';
 import type { InvoiceDraft } from './invoicing.service.js';
 
@@ -8,7 +8,7 @@ import type { InvoiceDraft } from './invoicing.service.js';
 export class InvoicingController {
   constructor(
     private readonly invoicingService: InvoicingService,
-    private readonly invoicePdfService: InvoicePdfService,
+    private readonly invoicePrintService: InvoicePrintService,
   ) {}
 
   @Get()
@@ -31,13 +31,13 @@ export class InvoicingController {
     return this.invoicingService.issue(id);
   }
 
-  @Get(':id/pdf')
-  @Header('Content-Type', 'application/pdf')
-  async downloadPdf(@Param('id') id: string, @Res() response: Response) {
+  @Get(':id/print')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  printInvoice(@Param('id') id: string, @Res() response: Response) {
     const invoice = this.invoicingService.findById(id);
-    const pdf = await this.invoicePdfService.generate(invoice);
-    response.setHeader('Content-Type', 'application/pdf');
-    response.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(invoice.invoiceNumber || invoice.id)}.pdf"`);
-    response.send(pdf);
+    const printableInvoice = this.invoicePrintService.generate(invoice);
+    response.setHeader('Content-Type', 'text/html; charset=utf-8');
+    response.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(invoice.invoiceNumber || invoice.id)}.html"`);
+    response.send(printableInvoice);
   }
 }

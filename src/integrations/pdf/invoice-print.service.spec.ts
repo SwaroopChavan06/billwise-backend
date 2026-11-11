@@ -1,8 +1,8 @@
-import { InvoicePdfService } from './invoice-pdf.service';
+import { InvoicePrintService } from './invoice-print.service';
 import type { IssuedInvoice } from '../../invoicing/invoicing.service';
 
-describe('InvoicePdfService', () => {
-  it('generates a downloadable PDF for an invoice', async () => {
+describe('InvoicePrintService', () => {
+  it('renders an HTML tax invoice with printable details', () => {
     const invoice: IssuedInvoice = {
       id: 'invoice-pdf-test',
       customerId: 'cust-1',
@@ -40,8 +40,15 @@ describe('InvoicePdfService', () => {
       amountInWords: 'Rupees One Thousand One Hundred Eighty Only',
     };
 
-    const pdf = await new InvoicePdfService().generate(invoice);
-    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
-    expect(pdf.length).toBeGreaterThan(500);
+    const html = new InvoicePrintService().generate(invoice);
+    expect(html).toContain('<table class="items">');
+    expect(html).toContain('Sakshi Swayamrojgar Utpadan Kendra Kudal');
+    expect(html).toContain('At Post Kudal, Bhairavwadi, Tal. Kudal, Dist. Sindhudurg, Maharashtra - 416520');
+    expect(html).toContain('27AAAAA0000A1Z5 (SAMPLE - REPLACE WITH ACTUAL GSTIN)');
+    expect(html).toContain('Invoice date &amp; time:');
+    expect(html).toMatch(/\d{2}:\d{2}:\d{2}/);
+    expect(html).toContain('Print / Save as PDF');
+    expect(html).toContain('Business cards');
+    expect(html).toContain('0000000000 (SAMPLE)');
   });
 });

@@ -43,7 +43,7 @@ Redis. PostgreSQL is required when Prisma persistence is connected.
 | `GET` | `/` | Health/basic NestJS response |
 | `GET` | `/api/v1/invoices` | List drafts and issued invoices with calculated totals |
 | `POST` | `/api/v1/invoices` | Create and issue an invoice |
-| `GET` | `/api/v1/invoices/:id/pdf` | Download invoice PDF |
+| `GET` | `/api/v1/invoices/:id/print` | Open print-ready HTML invoice and use Print / Save as PDF |
 | `POST` | `/api/v1/invoices/drafts` | Create a calculated invoice draft |
 | `POST` | `/api/v1/invoices/:id/issue` | Validate and issue a draft |
 | `GET` | `/api/v1/products` | List products |
@@ -93,13 +93,16 @@ The response includes the invoice number, customer contact snapshot, each
 calculated line total, CGST/SGST or IGST, and the final total. The product
 catalog values are used instead of trusting submitted rate/HSN/unit/GST values.
 
-### 4. Download the invoice PDF
+### 4. Print or save invoice as PDF
 
-Use the invoice `id` from the create response:
+Open the print view using the invoice `id` from the create response:
 
 ```powershell
-curl.exe -o invoice-001.pdf http://localhost:3000/api/v1/invoices/invoice-001/pdf
+Start-Process http://localhost:3000/api/v1/invoices/invoice-001/print
 ```
+
+Select **Print / Save as PDF** in the opened page, then choose **Save as PDF**
+as the printer destination.
 
 ### 5. List invoices
 
