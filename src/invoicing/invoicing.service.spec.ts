@@ -78,4 +78,45 @@ describe('InvoicingService', () => {
       })),
     })).toThrow(BadRequestException);
   });
+
+  it('rejects fractional quantities', () => {
+    expect(() => service.create({
+      id: 'invoice-fractional-quantity',
+      customerId: 'cust-1',
+      customerName: 'Apex Architects',
+      customerStateCode: '27',
+      branchStateCode: '27',
+      lines: [{
+        productId: 'prod-business-cards',
+        description: '',
+        hsnCode: '',
+        unit: '',
+        quantity: 1.5,
+        rate: 0,
+        gstRate: 0,
+      }],
+    })).toThrow(BadRequestException);
+  });
+
+  it('filters invoices by customer ID', () => {
+    service.create({
+      id: 'invoice-customer-one',
+      customerId: 'cust-1',
+      customerName: 'Apex Architects',
+      customerStateCode: '27',
+      branchStateCode: '27',
+      lines: [{ productId: 'prod-business-cards', description: '', hsnCode: '', unit: '', quantity: 1, rate: 0, gstRate: 0 }],
+    });
+    service.create({
+      id: 'invoice-customer-two',
+      customerId: 'cust-2',
+      customerName: 'Greenfield Events',
+      customerStateCode: '27',
+      branchStateCode: '27',
+      lines: [{ productId: 'prod-business-cards', description: '', hsnCode: '', unit: '', quantity: 1, rate: 0, gstRate: 0 }],
+    });
+
+    expect(service.listIssued('cust-1').map((invoice) => invoice.id)).toEqual(['invoice-customer-one']);
+    expect(service.listIssued('cust-no-invoices')).toEqual([]);
+  });
 });

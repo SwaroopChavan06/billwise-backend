@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 
 export interface Customer {
   id: string;
@@ -24,6 +25,27 @@ export class CustomersService {
     return this.customers.filter((customer) =>
       `${customer.name} ${customer.phone} ${customer.email}`.toLowerCase().includes(normalizedQuery),
     );
+  }
+
+  create(customer: Omit<Customer, 'id'>): Customer {
+    if (!customer.name?.trim() || !customer.phone?.trim() || !customer.address?.trim() || !customer.stateCode?.trim()) {
+      throw new BadRequestException('Customer name, phone, address, and state code are required');
+    }
+    const duplicatePhone = this.customers.some((existing) => existing.phone === customer.phone.trim());
+    if (duplicatePhone) throw new BadRequestException('A customer with this phone number already exists');
+
+    const createdCustomer: Customer = {
+      ...customer,
+      id: `cust-${randomUUID()}`,
+      name: customer.name.trim(),
+      phone: customer.phone.trim(),
+      email: customer.email?.trim() ?? '',
+      address: customer.address.trim(),
+      stateCode: customer.stateCode.trim(),
+      gstin: customer.gstin?.trim() || undefined,
+    };
+    this.customers.push(createdCustomer);
+    return createdCustomer;
   }
 
   findById(id: string): Customer {

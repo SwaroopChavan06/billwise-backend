@@ -50,6 +50,11 @@ Redis. PostgreSQL is required when Prisma persistence is connected.
 | `GET` | `/api/v1/products?search=paper` | Search products by name, SKU, or HSN |
 | `GET` | `/api/v1/customers` | List customers |
 | `GET` | `/api/v1/customers?search=apex` | Search by customer name, phone, or email |
+| `POST` | `/api/v1/customers` | Create a customer |
+| `GET` | `/api/v1/invoices?customerId=cust-1` | List invoices for one customer |
+
+Invoice and order item quantities are whole numbers. Fractional invoice
+quantities are rejected by the API.
 
 There is currently no authentication required.
 

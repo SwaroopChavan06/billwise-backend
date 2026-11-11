@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Param, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { InvoicePrintService } from '../integrations/pdf/invoice-print.service.js';
 import { InvoicingService } from './invoicing.service.js';
@@ -12,8 +12,8 @@ export class InvoicingController {
   ) {}
 
   @Get()
-  list() {
-    return this.invoicingService.listIssued();
+  list(@Query('customerId') customerId?: string) {
+    return this.invoicingService.listIssued(customerId);
   }
 
   @Post('drafts')

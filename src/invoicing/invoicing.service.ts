@@ -106,8 +106,9 @@ export class InvoicingService {
     return invoice;
   }
 
-  listIssued(): IssuedInvoice[] {
-    return [...this.issued.values(), ...this.drafts.values()];
+  listIssued(customerId?: string): IssuedInvoice[] {
+    const invoices = [...this.issued.values(), ...this.drafts.values()];
+    return customerId ? invoices.filter((invoice) => invoice.customerId === customerId) : invoices;
   }
 
   findById(id: string): IssuedInvoice {
@@ -145,13 +146,13 @@ export class InvoicingService {
         throw new BadRequestException('Description, HSN code, and unit are required on every item');
       }
       if (
-        !Number.isFinite(resolvedLine.quantity) || resolvedLine.quantity <= 0 ||
+        !Number.isInteger(resolvedLine.quantity) || resolvedLine.quantity <= 0 ||
         !Number.isFinite(resolvedLine.rate) || resolvedLine.rate < 0 ||
         !Number.isFinite(resolvedLine.gstRate) || resolvedLine.gstRate < 0 ||
         !Number.isFinite(discount) || discount < 0 ||
         discount > resolvedLine.quantity * resolvedLine.rate
       ) {
-        throw new BadRequestException('Item quantity, rate, discount, and GST rate must be valid non-negative values');
+        throw new BadRequestException('Item quantity must be a positive whole number; rate, discount, and GST rate must be valid non-negative values');
       }
       const result = calculateGst(resolvedLine, draft.branchStateCode === customerStateCode);
       return {
