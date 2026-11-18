@@ -2,45 +2,59 @@ import { Injectable } from '@nestjs/common';
 import type { IssuedInvoice } from '../../invoicing/invoicing.service.js';
 
 const supplier = {
-  name: 'Sakshi Swayamrojgar Utpadan Kendra Kudal',
-  address: 'At Post Kudal, Bhairavwadi, Tal. Kudal, Dist. Sindhudurg, Maharashtra - 416520',
-  gstin: '27AAAAA0000A1Z5 (SAMPLE - REPLACE WITH ACTUAL GSTIN)',
-  bankName: 'Sample Bank (replace with actual bank)',
-  accountName: 'Sakshi Swayamrojgar Utpadan Kendra Kudal',
-  accountNumber: '0000000000 (SAMPLE)',
-  ifsc: 'SAMP0000000 (SAMPLE)',
-  branch: 'Kudal (SAMPLE)',
+  name: 'Sakshi Swayam Rojgar Stationary Utpadan Kendra',
+  address: '2896-1, Bhairavwadi, Near Panchayat Samiti, Main Road Kudal, Tal-Kudal 416520, Dist-Sindhudurg',
+  phone: '9823141369',
+  gstin: '27AOSPC7246L1ZD',
+  state: 'Maharashtra',
+  stateCode: '27',
+  pan: 'BLJPM3008B',
+  bankName: 'Bank of Maharashtra',
+  accountNumber: '60207308004',
+  branch: 'KUDAL',
+  ifsc: 'MAHB0000070',
+  jurisdiction: 'Kudal',
+  declaration: 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.',
 };
 
 @Injectable()
 export class InvoicePrintService {
   generate(invoice: IssuedInvoice): string {
-    const issuedAt = new Date(invoice.issueDate).toLocaleString('en-IN', {
+    const issuedDate = new Date(invoice.issueDate);
+    const date = issuedDate.toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'long',
       year: 'numeric',
+      timeZone: 'Asia/Kolkata',
+    });
+    const timeParts = new Intl.DateTimeFormat('en-IN', {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
       hour12: true,
       timeZone: 'Asia/Kolkata',
-    });
+    }).formatToParts(issuedDate);
+    const timePart = (type: Intl.DateTimeFormatPartTypes) =>
+      timeParts.find((part) => part.type === type)?.value ?? '';
+    const invoiceDateTime = invoice.includeDateTime
+      ? `${date} at ${timePart('hour')}:${timePart('minute')}:${timePart('second')} ${timePart('dayPeriod').toLowerCase()} IST`
+      : '';
     const lines = invoice.lines.map((line, index) => `
       <tr>
         <td class="center">${index + 1}</td>
         <td>${escapeHtml(line.description)}</td>
         <td class="center">${escapeHtml(line.hsnCode)}</td>
+        <td class="center">${formatQuantity(line.gstRate)}%</td>
         <td class="number">${formatQuantity(line.quantity)} ${escapeHtml(line.unit)}</td>
         <td class="number">${formatMoney(line.rate)}</td>
         <td class="number">${formatMoney(line.discount ?? 0)}</td>
         <td class="number">${formatMoney(line.taxableValue)}</td>
-        <td class="center">${formatQuantity(line.gstRate)}%</td>
         <td class="number">${formatMoney(line.total)}</td>
       </tr>`).join('');
     const taxRows = invoice.igst > 0
-      ? `<tr><th colspan="2">IGST</th><td class="number">${formatMoney(invoice.igst)}</td></tr>`
-      : `<tr><th colspan="2">CGST</th><td class="number">${formatMoney(invoice.cgst)}</td></tr>
-         <tr><th colspan="2">SGST</th><td class="number">${formatMoney(invoice.sgst)}</td></tr>`;
+      ? `<tr><th>Output IGST @ ${formatTaxRate(invoice.igst, invoice.taxableValue)}%</th><td class="number">${formatMoney(invoice.igst)}</td></tr>`
+      : `<tr><th>Output CGST @ ${formatTaxRate(invoice.cgst, invoice.taxableValue)}%</th><td class="number">${formatMoney(invoice.cgst)}</td></tr>
+         <tr><th>Output SGST @ ${formatTaxRate(invoice.sgst, invoice.taxableValue)}%</th><td class="number">${formatMoney(invoice.sgst)}</td></tr>`;
 
     return `<!doctype html>
 <html lang="en">
@@ -49,53 +63,83 @@ export class InvoicePrintService {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tax invoice ${escapeHtml(invoice.invoiceNumber || invoice.id)}</title>
   <style>
-    :root { color: #172033; font: 13px/1.45 Arial, Helvetica, sans-serif; }
+    :root { color: #172033; font: 12px/1.4 Arial, Helvetica, sans-serif; }
     * { box-sizing: border-box; }
-    body { margin: 0; background: #edf0f4; }
+    body { margin: 0; background: #eef1f5; }
     .toolbar { max-width: 210mm; margin: 16px auto 0; display: flex; justify-content: flex-end; }
     .toolbar button { border: 0; border-radius: 5px; background: #1d3557; color: white; padding: 10px 16px; font-size: 13px; cursor: pointer; }
-    .sheet { width: 210mm; min-height: 297mm; margin: 12px auto 24px; padding: 14mm; background: white; box-shadow: 0 4px 24px #1720331a; }
-    .title { margin: 0 0 12px; text-align: center; font-size: 18px; letter-spacing: 1.5px; }
-    .supplier { border: 1px solid #26364d; padding: 12px 14px; text-align: center; }
-    .supplier h2 { margin: 0 0 5px; font-size: 17px; }
-    .supplier p { margin: 2px 0; }
-    .invoice-meta, .party-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #26364d; border-top: 0; }
-    .invoice-meta > div, .party-grid > section { padding: 9px 11px; }
-    .invoice-meta > div + div, .party-grid > section + section { border-left: 1px solid #26364d; }
-    .party-grid h3 { margin: 0 0 6px; background: #edf2f7; padding: 6px; font-size: 12px; text-transform: uppercase; }
+    .sheet { display: flex; flex-direction: column; width: 210mm; min-height: 297mm; margin: 12px auto 24px; padding: 12mm; background: white; box-shadow: 0 4px 24px #1720331a; }
+    .invoice-header { flex: none; }
+    .document-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .document-heading h1 { margin: 0; font-size: 17px; letter-spacing: 1.2px; }
+    .copy-label { border: 1px solid #52647a; padding: 4px 8px; color: #52647a; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+    .supplier { border: 1px solid #45566d; padding: 12px 14px; text-align: center; }
+    .supplier h2 { margin: 0 0 5px; color: #152840; font-size: 17px; }
+    .supplier p { margin: 3px 0; }
+    .supplier .supplier-address { max-width: 560px; margin: 0 auto; }
+    .supplier .supplier-identity { display: flex; justify-content: center; flex-wrap: wrap; column-gap: 18px; margin-top: 6px; font-size: 10px; }
+    .invoice-meta, .party-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #45566d; border-top: 0; }
+    .invoice-meta { grid-template-columns: 1fr 1.2fr; align-items: center; font-size: 10px; }
+    .invoice-meta > div, .party-grid > section { min-width: 0; padding: 9px 11px; }
+    .invoice-meta > div { white-space: nowrap; }
+    .invoice-meta > div + div, .party-grid > section + section { border-left: 1px solid #45566d; }
+    .invoice-date-time { white-space: nowrap; }
+    .party-grid h3 { margin: 0 0 7px; padding: 6px 8px; background: #edf2f7; color: #26364d; font-size: 10px; letter-spacing: .5px; text-transform: uppercase; }
     .party-grid p { margin: 3px 0; }
-    .items { width: 100%; margin-top: 14px; border-collapse: collapse; table-layout: fixed; }
-    .items th, .items td { border: 1px solid #26364d; padding: 7px 5px; overflow-wrap: anywhere; }
-    .items thead th { background: #edf2f7; font-size: 10px; text-align: center; }
-    .items td { font-size: 10px; }
-    .items th:nth-child(1) { width: 5%; }.items th:nth-child(2) { width: 22%; }.items th:nth-child(3) { width: 9%; }
-    .items th:nth-child(4) { width: 11%; }.items th:nth-child(5) { width: 11%; }.items th:nth-child(6) { width: 9%; }
-    .items th:nth-child(7) { width: 12%; }.items th:nth-child(8) { width: 7%; }.items th:nth-child(9) { width: 14%; }
+    .items-area { display: flex; flex: 1 1 0; flex-direction: column; min-height: 24mm; margin-top: 8px; }
+    .items { flex: none; width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .items-blank-space { flex: 1 1 auto; width: 100%; min-height: 0; border-collapse: collapse; table-layout: fixed; }
+    .items-blank-space td { height: 100%; padding: 0; border: 0; border-right: 1px solid #45566d; border-bottom: 1px solid #45566d; }
+    .items-blank-space td:first-child { border-left: 1px solid #45566d; }
+    .items-blank-space td:nth-child(1) { width: 5%; }.items-blank-space td:nth-child(2) { width: 23%; }.items-blank-space td:nth-child(3) { width: 9%; }
+    .items-blank-space td:nth-child(4) { width: 8%; }.items-blank-space td:nth-child(5) { width: 11%; }.items-blank-space td:nth-child(6) { width: 8%; }
+    .items-blank-space td:nth-child(7) { width: 12%; }.items-blank-space td:nth-child(8) { width: 8%; }.items-blank-space td:nth-child(9) { width: 16%; }
+    .items th, .items td { border: 1px solid #45566d; padding: 6px 4px; overflow-wrap: anywhere; }
+    .items thead th { background: #edf2f7; color: #26364d; font-size: 9px; text-align: center; }
+    .items tbody tr { height: 1.65em; }
+    .items td { font-size: 9px; vertical-align: top; }
+    .items th:nth-child(1) { width: 5%; }.items th:nth-child(2) { width: 23%; }.items th:nth-child(3) { width: 9%; }
+    .items th:nth-child(4) { width: 8%; }.items th:nth-child(5) { width: 11%; }.items th:nth-child(6) { width: 8%; }
+    .items th:nth-child(7) { width: 12%; }.items th:nth-child(8) { width: 8%; }.items th:nth-child(9) { width: 16%; }
     .center { text-align: center; }.number { text-align: right; white-space: nowrap; }
-    .bottom-grid { display: grid; grid-template-columns: 1fr 245px; gap: 16px; margin-top: 12px; align-items: start; }
-    .words, .bank, .signature { border: 1px solid #26364d; padding: 9px 10px; }
-    .words { margin-bottom: 12px; }.words strong, .bank h3 { display: block; margin: 0 0 5px; font-size: 11px; }
-    .bank p { margin: 3px 0; font-size: 10px; }.bank .sample { color: #8a4b08; }
-    .totals { width: 100%; border-collapse: collapse; }.totals th, .totals td { border: 1px solid #26364d; padding: 7px 8px; }.totals th { text-align: left; font-weight: normal; }.totals .grand-total th, .totals .grand-total td { background: #edf2f7; font-weight: bold; font-size: 14px; }
-    .signature { min-height: 74px; margin-top: 12px; text-align: right; }.signature span { display: block; margin-top: 30px; }
-    .footnote { margin-top: 16px; text-align: center; font-size: 10px; color: #5d6877; }
+    .invoice-bottom { flex: none; margin-top: 8px; }
+    .summary-grid { display: grid; grid-template-columns: 1fr 250px; gap: 14px; align-items: start; }
+    .words, .bank, .declaration, .signature { border: 1px solid #45566d; padding: 9px 10px; }
+    .words { min-height: 56px; }.words strong, .bank h3, .declaration h3 { display: block; margin: 0 0 5px; font-size: 10px; }
+    .bank { margin-top: 9px; }.bank p { margin: 3px 0; font-size: 9px; }
+    .totals { width: 100%; table-layout: fixed; border-collapse: collapse; }
+    .totals th, .totals td { height: 28px; border: 1px solid #45566d; padding: 5px 7px; font-size: 10px; }
+    .totals th { width: 68%; text-align: left; font-weight: 500; }.totals td { width: 32%; }
+    .totals .grand-total th, .totals .grand-total td { height: 34px; background: #edf2f7; font-weight: 700; font-size: 12px; }
+    .bottom-grid { display: grid; grid-template-columns: 1fr 250px; gap: 14px; margin-top: 8px; align-items: stretch; }
+    .declaration { font-size: 9px; }.signature { display: flex; min-height: 92px; flex-direction: column; justify-content: space-between; text-align: right; font-size: 10px; }
+    .signature span { padding-top: 32px; }
+    .page-footer { padding-top: 8px; text-align: center; color: #435168; font-size: 9px; }
+    .page-footer p { margin: 3px 0; }.page-footer .generated { font-weight: 700; }
     @page { size: A4; margin: 0; }
-    @media print { body { background: white; }.toolbar { display: none; }.sheet { width: auto; min-height: 0; margin: 0; padding: 12mm; box-shadow: none; } tr { break-inside: avoid; } }
+    @media print { body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }.toolbar { display: none; }.sheet { width: 210mm; height: 297mm; min-height: 0; margin: 0; padding: 10mm; box-shadow: none; }.invoice-header, .invoice-bottom { break-inside: avoid; }.items-area { min-height: 0; margin-top: 6px; }.items th, .items td { padding: 4px 3px; }.items tbody tr { height: 1.5em; }.summary-grid { grid-template-columns: 1fr 230px; gap: 8px; }.words, .bank, .declaration, .signature { padding: 6px 8px; }.words { min-height: 0; }.bank { margin-top: 6px; }.totals th, .totals td { height: 22px; padding: 3px 5px; }.totals .grand-total th, .totals .grand-total td { height: 27px; }.bottom-grid { grid-template-columns: 1fr 230px; gap: 8px; margin-top: 6px; }.signature { min-height: 68px; }.signature span { padding-top: 20px; }.page-footer { padding-top: 5px; } tr { break-inside: avoid; } }
     @media screen and (max-width: 760px) { .sheet { width: 100%; min-height: 100vh; margin: 0; padding: 16px; overflow-x: auto; }.items { min-width: 680px; }.toolbar { margin: 10px; } }
   </style>
 </head>
 <body>
   <div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button></div>
   <main class="sheet">
-    <h1 class="title">TAX INVOICE</h1>
+    <div class="invoice-header">
+    <div class="document-heading">
+      <h1>TAX INVOICE</h1>
+    </div>
     <header class="supplier">
       <h2>${escapeHtml(supplier.name)}</h2>
-      <p>${escapeHtml(supplier.address)}</p>
-      <p><strong>GSTIN:</strong> ${escapeHtml(supplier.gstin)}</p>
+      <p class="supplier-address">${escapeHtml(supplier.address)}</p>
+      <div class="supplier-identity">
+        <span><strong>Ph. No.:</strong> ${escapeHtml(supplier.phone)}</span>
+        <span><strong>GSTIN/UIN:</strong> ${escapeHtml(supplier.gstin)}</span>
+        <span><strong>State:</strong> ${escapeHtml(supplier.state)}, Code: ${escapeHtml(supplier.stateCode)}</span>
+      </div>
     </header>
     <section class="invoice-meta">
       <div><strong>Invoice number:</strong> ${escapeHtml(invoice.invoiceNumber || 'DRAFT')}</div>
-      <div><strong>Invoice date &amp; time:</strong> ${escapeHtml(issuedAt)} IST</div>
+      <div><strong>Invoice date &amp; time:</strong> ${invoiceDateTime ? `<span class="invoice-date-time">${escapeHtml(invoiceDateTime)}</span>` : ''}</div>
     </section>
     <section class="party-grid">
       <section>
@@ -108,24 +152,29 @@ export class InvoicePrintService {
       </section>
       <section>
         <h3>Supply details</h3>
-        <p><strong>Place of supply:</strong> ${escapeHtml(invoice.customerStateCode)}</p>
+        <p><strong>Place of supply:</strong> ${escapeHtml(invoice.customerStateCode === supplier.stateCode ? supplier.state : invoice.customerStateCode)}</p>
         <p><strong>Reverse charge:</strong> No</p>
       </section>
     </section>
+    </div>
+    <div class="items-area">
     <table class="items">
-      <thead><tr><th>Sr. no.</th><th>Description</th><th>HSN</th><th>Quantity</th><th>Rate (INR)</th><th>Discount</th><th>Taxable value</th><th>GST</th><th>Line total (INR)</th></tr></thead>
+      <thead><tr><th>Sr. no.</th><th>Description of goods and services</th><th>HSN/SAC</th><th>GST</th><th>Quantity</th><th>Rate (INR)</th><th>Discount</th><th>Taxable value</th><th>Amount (INR)</th></tr></thead>
       <tbody>${lines}</tbody>
     </table>
-    <section class="bottom-grid">
+    <table class="items-blank-space" aria-hidden="true" role="presentation">
+      <tbody><tr>${'<td></td>'.repeat(9)}</tr></tbody>
+    </table>
+    </div>
+    <div class="invoice-bottom">
+    <section class="summary-grid">
       <div>
-        <div class="words"><strong>Amount in words</strong>${escapeHtml(invoice.amountInWords)}</div>
+        <div class="words"><strong>Amount chargeable (in words)</strong>${escapeHtml(invoice.amountInWords)}</div>
         <div class="bank">
-          <h3>Bank details <span class="sample">- SAMPLE DETAILS, REPLACE BEFORE USE</span></h3>
-          <p><strong>Account name:</strong> ${escapeHtml(supplier.accountName)}</p>
+          <h3>Company's bank details</h3>
           <p><strong>Bank:</strong> ${escapeHtml(supplier.bankName)}</p>
-          <p><strong>Account number:</strong> ${escapeHtml(supplier.accountNumber)}</p>
-          <p><strong>IFSC:</strong> ${escapeHtml(supplier.ifsc)}</p>
-          <p><strong>Branch:</strong> ${escapeHtml(supplier.branch)}</p>
+          <p><strong>A/c No.:</strong> ${escapeHtml(supplier.accountNumber)}</p>
+          <p><strong>Branch &amp; IFS Code:</strong> ${escapeHtml(supplier.branch)} &amp; ${escapeHtml(supplier.ifsc)}</p>
         </div>
       </div>
       <div>
@@ -133,12 +182,23 @@ export class InvoicePrintService {
           <tr><th>Subtotal</th><td class="number">${formatMoney(invoice.subtotal)}</td></tr>
           <tr><th>Taxable value</th><td class="number">${formatMoney(invoice.taxableValue)}</td></tr>
           ${taxRows}
-          <tr class="grand-total"><th>Total</th><td class="number">INR ${formatMoney(invoice.total)}</td></tr>
+          ${invoice.roundOff ? `<tr><th>Round off</th><td class="number">${formatMoney(invoice.roundOff)}</td></tr>` : ''}
+          <tr class="grand-total"><th>Total</th><td class="number">INR ${formatWholeMoney(invoice.total)}</td></tr>
         </table>
-        <div class="signature"><strong>For ${escapeHtml(supplier.name)}</strong><span>Authorised signature</span></div>
       </div>
     </section>
-    <p class="footnote">This is a computer-generated invoice.</p>
+    <section class="bottom-grid">
+      <div class="declaration">
+        <h3>Company's PAN: ${escapeHtml(supplier.pan)}</h3>
+        <strong>Declaration</strong>
+        <p>${escapeHtml(supplier.declaration)}</p>
+      </div>
+      <div class="signature"><strong>For ${escapeHtml(supplier.name)}</strong><span>Authorised Signatory</span></div>
+    </section>
+    <footer class="page-footer">
+      <p class="generated">This is a Computer Generated Invoice.</p>
+    </footer>
+    </div>
   </main>
 </body>
 </html>`;
@@ -157,6 +217,18 @@ function escapeHtml(value: string): string {
 
 function formatMoney(value: number): string {
   return value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatWholeMoney(value: number): string {
+  return value.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+}
+
+function formatTaxRate(tax: number, taxableValue: number): string {
+  if (taxableValue === 0) return '0.00';
+  return ((tax / taxableValue) * 100).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function formatQuantity(value: number): string {

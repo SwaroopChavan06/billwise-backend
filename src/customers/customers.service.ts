@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
+import { DEFAULT_BRANCH_ID, PrismaService } from '../database/prisma.service.js';
+import { paginationMetadata, type PaginatedResult, type PaginationQuery } from '../common/pagination.js';
 
 export interface Customer {
   id: string;
@@ -9,48 +12,107 @@ export interface Customer {
   email: string;
   address: string;
   stateCode: string;
+  invoiceCount?: number;
 }
 
 @Injectable()
 export class CustomersService {
-  private readonly customers: Customer[] = [
-    { id: 'cust-1', name: 'Apex Architects', gstin: '27ABCDE1234F1Z5', phone: '+91 98765 43210', email: 'accounts@apex.example', address: '12 Design District, Mumbai, Maharashtra', stateCode: '27' },
-    { id: 'cust-2', name: 'Greenfield Events', phone: '+91 98200 11223', email: 'billing@greenfield.example', address: '45 Garden Road, Mumbai, Maharashtra', stateCode: '27' },
-    { id: 'cust-3', name: 'Northstar Retail', phone: '+91 98100 44556', email: 'finance@northstar.example', address: '8 Market Street, Bengaluru, Karnataka', stateCode: '29' },
-  ];
+  constructor(private readonly prisma: PrismaService) {}
 
-  search(query = ''): Customer[] {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return this.customers;
-    return this.customers.filter((customer) =>
-      `${customer.name} ${customer.phone} ${customer.email}`.toLowerCase().includes(normalizedQuery),
-    );
+  async search(query: PaginationQuery): Promise<PaginatedResult<Customer>> {
+    const where: Prisma.CustomerWhereInput = {
+      branchId: DEFAULT_BRANCH_ID,
+      deletedAt: null,
+      ...(query.search ? {
+        OR: [
+          { name: { contains: query.search, mode: 'insensitive' } },
+          { phone: { contains: query.search, mode: 'insensitive' } },
+          { email: { contains: query.search, mode: 'insensitive' } },
+        ],
+      } : {}),
+    };
+    const totalRecords = await this.prisma.customer.count({ where });
+    const pagination = paginationMetadata(query.page, query.limit, totalRecords);
+    const data = await this.prisma.customer.findMany({
+      where,
+      orderBy: { [query.sortBy]: query.sortOrder },
+      skip: (pagination.currentPage - 1) * query.limit,
+      take: query.limit,
+      include: { _count: { select: { invoices: true } } },
+    });
+    return {
+      data: data.map((customer) => ({
+        id: customer.id,
+        name: customer.name,
+        gstin: customer.gstin ?? undefined,
+        phone: customer.phone ?? '',
+        email: customer.email ?? '',
+        address: customer.address,
+        stateCode: customer.stateCode,
+        invoiceCount: customer._count.invoices,
+      })),
+      pagination,
+    };
   }
 
-  create(customer: Omit<Customer, 'id'>): Customer {
+  async create(customer: Omit<Customer, 'id' | 'invoiceCount'>): Promise<Customer> {
     if (!customer.name?.trim() || !customer.phone?.trim() || !customer.address?.trim() || !customer.stateCode?.trim()) {
       throw new BadRequestException('Customer name, phone, address, and state code are required');
     }
-    const duplicatePhone = this.customers.some((existing) => existing.phone === customer.phone.trim());
+    const phone = customer.phone.trim();
+    const duplicatePhone = await this.prisma.customer.findFirst({
+      where: { branchId: DEFAULT_BRANCH_ID, phone, deletedAt: null },
+      select: { id: true },
+    });
     if (duplicatePhone) throw new BadRequestException('A customer with this phone number already exists');
 
-    const createdCustomer: Customer = {
-      ...customer,
-      id: `cust-${randomUUID()}`,
-      name: customer.name.trim(),
-      phone: customer.phone.trim(),
-      email: customer.email?.trim() ?? '',
-      address: customer.address.trim(),
-      stateCode: customer.stateCode.trim(),
-      gstin: customer.gstin?.trim() || undefined,
-    };
-    this.customers.push(createdCustomer);
-    return createdCustomer;
+    try {
+      const createdCustomer = await this.prisma.customer.create({
+        data: {
+          id: `cust-${randomUUID()}`,
+          branchId: DEFAULT_BRANCH_ID,
+          name: customer.name.trim(),
+          phone,
+          email: customer.email?.trim() || null,
+          address: customer.address.trim(),
+          stateCode: customer.stateCode.trim(),
+          gstin: customer.gstin?.trim() || null,
+        },
+      });
+      return this.toCustomer(createdCustomer);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new BadRequestException('A customer with this phone number already exists');
+      }
+      throw error;
+    }
   }
 
-  findById(id: string): Customer {
-    const customer = this.customers.find((item) => item.id === id);
+  async findById(id: string): Promise<Customer> {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id, branchId: DEFAULT_BRANCH_ID, deletedAt: null },
+    });
     if (!customer) throw new NotFoundException(`Customer ${id} was not found`);
-    return customer;
+    return this.toCustomer(customer);
+  }
+
+  private toCustomer(customer: {
+    id: string;
+    name: string;
+    gstin: string | null;
+    phone: string | null;
+    email: string | null;
+    address: string;
+    stateCode: string;
+  }): Customer {
+    return {
+      id: customer.id,
+      name: customer.name,
+      gstin: customer.gstin ?? undefined,
+      phone: customer.phone ?? '',
+      email: customer.email ?? '',
+      address: customer.address,
+      stateCode: customer.stateCode,
+    };
   }
 }

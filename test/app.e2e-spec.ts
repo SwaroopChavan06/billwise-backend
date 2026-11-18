@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { PrismaService } from './../src/database/prisma.service';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -10,7 +11,10 @@ describe('AppController (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue({})
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
@@ -21,6 +25,23 @@ describe('AppController (e2e)', () => {
       .get('/')
       .expect(200)
       .expect('Hello World!');
+  });
+
+  it('reports an empty session before sign-in', () => {
+    return request(app.getHttpServer())
+      .get('/api/v1/auth/session')
+      .expect(200)
+      .expect({ user: null });
+  });
+
+  it.each([
+    '/api/v1/invoices',
+    '/api/v1/customers',
+    '/api/v1/products',
+  ])('protects %s from unauthenticated requests', (path) => {
+    return request(app.getHttpServer())
+      .get(path)
+      .expect(401);
   });
 
   afterEach(async () => {

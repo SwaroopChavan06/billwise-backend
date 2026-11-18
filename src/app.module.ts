@@ -9,6 +9,10 @@ import { ProductsService } from './products/products.service.js';
 import { CustomersController } from './customers/customers.controller.js';
 import { CustomersService } from './customers/customers.service.js';
 import { InvoicePrintService } from './integrations/pdf/invoice-print.service.js';
+import { AuthController } from './auth/auth.controller.js';
+import { AuthGuard } from './auth/auth.guard.js';
+import { AuthService } from './auth/auth.service.js';
+import { PrismaService } from './database/prisma.service.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -23,7 +27,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       serviceId: 'api',
     }),
   ],
-  controllers: [AppController, InvoicingController, ProductsController, CustomersController],
-  providers: [AppService, InvoicingService, ProductsService, CustomersService, InvoicePrintService],
+  controllers: [AppController, InvoicingController, ProductsController, CustomersController, AuthController],
+  providers: [AppService, InvoicingService, ProductsService, CustomersService, InvoicePrintService, AuthService, AuthGuard, PrismaService],
 })
 export class AppModule {}

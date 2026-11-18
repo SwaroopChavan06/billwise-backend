@@ -105,13 +105,16 @@ model Product {
   gstRate       Decimal         @db.Decimal(5, 2)
   unit          String
   sellingPrice  Decimal         @db.Decimal(12, 2)
+  quantityAvailable Int         @default(0)
   deletedAt     DateTime?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   orderItems    OrderItem[]
   stockMovement StockMovement[]
+  invoiceItems  InvoiceItem[]
 
   @@unique([branchId, sku])
+  @@index([branchId, name])
 }
 
 model StockMovement {
@@ -159,14 +162,17 @@ model Invoice {
   id                   String        @id @default(uuid())
   branchId             String
   branch               Branch        @relation(fields: [branchId], references: [id])
-  orderId              String        @unique
-  order                Order         @relation(fields: [orderId], references: [id])
+  orderId              String?       @unique
+  order                Order?        @relation(fields: [orderId], references: [id])
   customerId           String
   customer             Customer      @relation(fields: [customerId], references: [id])
   status               InvoiceStatus @default(DRAFT)
   invoiceNumber        String?
   financialYear        String?
   issueDate            DateTime?
+  includeDateTime      Boolean       @default(true)
+  customerStateCode    String
+  branchStateCode      String
   dueDate              DateTime?
   placeOfSupply        String?
   reverseCharge        Boolean       @default(false)
@@ -195,12 +201,16 @@ model Invoice {
 
   @@unique([branchId, financialYear, invoiceNumber])
   @@index([branchId, issueDate])
+  @@index([branchId, customerId, issueDate])
+  @@index([branchId, status, invoiceNumber])
 }
 
 model InvoiceItem {
   id           String   @id @default(uuid())
   invoiceId    String
   invoice      Invoice  @relation(fields: [invoiceId], references: [id])
+  productId    String?
+  product      Product? @relation(fields: [productId], references: [id])
   lineNumber   Int
   description  String
   hsnCode      String
