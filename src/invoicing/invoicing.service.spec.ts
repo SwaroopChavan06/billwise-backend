@@ -131,10 +131,24 @@ describe('InvoicingService', () => {
     expect(invoice.roundOff).toBe(0.4);
   });
 
-  it('rejects invoices with more than 15 items', async () => {
+  it('accepts 50 items and rejects more than 50', async () => {
+    const invoice = await service.create({
+      ...makeDraft('invoice-50-items'),
+      lines: Array.from({ length: 50 }, () => ({
+        productId: 'prod-business-cards',
+        description: '',
+        hsnCode: '',
+        unit: '',
+        quantity: 1,
+        rate: 0,
+        gstRate: 0,
+      })),
+    });
+    expect(invoice.lines).toHaveLength(50);
+
     await expect(service.create({
       ...makeDraft('invoice-too-many-lines'),
-      lines: Array.from({ length: 16 }, () => ({
+      lines: Array.from({ length: 51 }, () => ({
         productId: 'prod-business-cards',
         description: '',
         hsnCode: '',

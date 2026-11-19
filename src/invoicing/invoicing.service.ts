@@ -225,7 +225,7 @@ export class InvoicingService {
     if (!Array.isArray(draft.lines) || draft.lines.length === 0) {
       throw new BadRequestException('An invoice must contain at least one line');
     }
-    if (draft.lines.length > 15) throw new BadRequestException('An invoice can contain at most 15 items');
+    if (draft.lines.length > 50) throw new BadRequestException('An invoice can contain at most 50 items');
 
     const customer = draft.customerId ? await this.customersService.findById(draft.customerId) : undefined;
     const customerStateCode = customer?.stateCode ?? draft.customerStateCode;

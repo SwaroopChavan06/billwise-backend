@@ -13,7 +13,7 @@ The current implementation contains:
 - Invoice totals and amount in words
 - Customer lookup with phone, email, address, GSTIN, and state
 - Product lookup and server-side product details with editable invoice rates
-- Invoices with up to 15 calculated line items
+- Invoices with up to 50 calculated line items
 - Downloadable invoice PDFs
 - Google sign-in restricted to the configured email allowlist
 - PostgreSQL-backed invoices, customers, and products
@@ -161,6 +161,9 @@ rate is editable and used for calculation. Discounts must be whole rupees. The
 API calculates totals, rounds the final invoice total to a whole rupee, and
 assigns the invoice number. Set `includeDateTime` to `true` to print the issue
 date and time; it is omitted when the field is absent or false.
+Invoices support up to 50 catalog items. Long invoices are split across A4
+pages with continuation text and page numbers; totals and the signature remain
+on the final page.
 
 ```powershell
 curl.exe -X POST http://localhost:3000/api/v1/invoices `
