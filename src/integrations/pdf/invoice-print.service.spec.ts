@@ -43,21 +43,25 @@ describe('InvoicePrintService', () => {
     };
 
     const html = new InvoicePrintService().generate(invoice);
-    expect(html).toContain('<table class="items">');
-    expect(html).toContain('.sheet { display: flex; flex-direction: column; width: 210mm; min-height: 297mm;');
-    expect(html).toContain('.items-area { display: flex; flex: 1 1 0; flex-direction: column; min-height: 0;');
-    expect(html).toContain('.items { flex: 1 1 auto; width: 100%; height: 100%; min-height: 0;');
-    expect(html).toContain('.items tbody { height: 100%; }');
-    expect(html).not.toContain('items-blank-space');
+    expect(html).toContain('<table class="items" id="measurement-items">');
+    expect(html).toContain('.sheet { display: flex; flex-direction: column; width: 210mm; height: 297mm;');
+    expect(html).toContain('.items-area { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; margin-top: 6px; }');
+    expect(html).toContain('.items { flex: none; width: 100%; border-collapse: collapse; table-layout: fixed; }');
+    expect(html).toContain("filler.className = 'items-blank-space';");
+    expect(html).toContain('linear-gradient(#45566d, #45566d) 84% 0 / 1px 100% no-repeat;');
     expect(html).toContain(':root { color: #172033; font: 12px/1.4 Arial, Helvetica, sans-serif; }');
     expect(html).toContain('-webkit-print-color-adjust: exact; print-color-adjust: exact;');
     expect(html).toContain('@page { size: A4; margin: 0; }');
     expect(html).toContain('.items td { font-size: 9px; vertical-align: top; }');
-    expect(html).toContain('.items tbody tr { height: 1.65em; }');
-    expect(html).not.toContain('blank-row');
-    expect(html).toContain('.invoice-bottom { flex: none; margin-top: 8px; }');
-    expect(html).toContain('.sheet { width: 210mm; height: 297mm; min-height: 0;');
-    expect(html.indexOf('<div class="invoice-header">')).toBeLessThan(html.indexOf('<div class="items-area">'));
+    expect(html).not.toContain('.items tbody tr { height:');
+    expect(html).toContain('.invoice-bottom { flex: none; margin-top: 8px; break-inside: avoid; }');
+    expect(html).toContain('thead { display: table-header-group; }');
+    expect(html).toContain('await document.fonts.ready;');
+    expect(html).toContain('row.getBoundingClientRect().height');
+    expect(html).toContain('pageHeader.cloneNode(true)');
+    expect(html).toContain('if (isFinalPage) page.append(sourceFooter.cloneNode(true));');
+    expect(html).toContain("document.getElementById('print-invoice').disabled = false;");
+    expect(html.indexOf('<div class="page-header">')).toBeLessThan(html.indexOf('<div class="items-area">'));
     expect(html.indexOf('<div class="items-area">')).toBeLessThan(html.indexOf('<div class="invoice-bottom">'));
     expect(html).toContain('Sakshi Swayam Rojgar Stationary Utpadan Kendra');
     expect(html).toContain('2896-1, Bhairavwadi, Near Panchayat Samiti, Main Road Kudal, Tal-Kudal 416520, Dist-Sindhudurg');
@@ -77,6 +81,7 @@ describe('InvoicePrintService', () => {
     expect(html).toContain('Output SGST @ 9.00%');
     expect(html).toContain('We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.');
     expect(html).toContain('This is a Computer Generated Invoice.');
+    expect(html).toContain('.page-footer.final-footer { position: relative; justify-content: center; }');
     expect(html).not.toContain('Notes');
     expect(html).not.toContain('Terms &amp; Conditions');
     expect(html).toContain('Page 1 of 1');
@@ -103,7 +108,8 @@ describe('InvoicePrintService', () => {
       })),
     });
     expect(fifteenLineHtml.match(/<td>Product \d+<\/td>/g)).toHaveLength(15);
-    expect(fifteenLineHtml).not.toContain('blank-row');
+    expect(fifteenLineHtml).not.toContain('<tr><td></td>');
+    expect(fifteenLineHtml).toContain('filler.className = \'items-blank-space\';');
 
     const fiftyLineHtml = new InvoicePrintService().generate({
       ...invoice,
@@ -112,19 +118,10 @@ describe('InvoicePrintService', () => {
         description: `Product ${index + 1}`,
       })),
     });
-    const pages = fiftyLineHtml.split('<main class="sheet">').slice(1).map((page) => page.split('</main>')[0]);
-    expect(pages).toHaveLength(3);
-    expect(pages.slice(0, -1).every((page) =>
-      page.includes('Continued on next page &rarr;') && !page.includes('class="invoice-bottom"'),
-    )).toBe(true);
-    expect(pages[0]).toContain('<h3>Bill to</h3>');
-    expect(pages[0]).toContain('<h3>Supply details</h3>');
-    expect(pages.slice(1).every((page) => !page.includes('class="party-grid"'))).toBe(true);
-    expect(pages[0]).toContain('Page 1 of 3');
-    expect(pages[2]).toContain('Page 3 of 3');
-    expect(pages[2]).toContain('class="invoice-bottom"');
-    expect(pages[2]).toContain('Authorised Signatory');
     expect(fiftyLineHtml.match(/<td>Product \d+<\/td>/g)).toHaveLength(50);
+    expect(fiftyLineHtml).toContain('pages.forEach((rowIndexes, pageIndex) =>');
+    expect(fiftyLineHtml).toContain('Continued on next page &rarr;');
+    expect(fiftyLineHtml).toContain('Page \' + (pageIndex + 1) + \' of \' + pages.length');
   });
 
   it('leaves invoice date and time blank when it was not requested', () => {

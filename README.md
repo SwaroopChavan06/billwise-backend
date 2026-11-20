@@ -161,9 +161,11 @@ rate is editable and used for calculation. Discounts must be whole rupees. The
 API calculates totals, rounds the final invoice total to a whole rupee, and
 assigns the invoice number. Set `includeDateTime` to `true` to print the issue
 date and time; it is omitted when the field is absent or false.
-Invoices support up to 50 catalog items. Long invoices are split across A4
-pages with continuation text and page numbers; totals and the signature remain
-on the final page.
+Invoices support up to 50 catalog items. The print page waits for fonts, measures
+the rendered item rows and fixed invoice sections in the browser, then packs
+whole rows into A4 pages by available height. Continuation pages repeat the
+item-table header, and the totals and signature remain grouped at the bottom of
+the final page.
 
 ```powershell
 curl.exe -X POST http://localhost:3000/api/v1/invoices `
